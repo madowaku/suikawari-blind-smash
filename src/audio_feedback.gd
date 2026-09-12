@@ -96,7 +96,6 @@ func _build_overlay() -> void:
 	overlay_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay_center.z_index = 100
-	game.add_child.call_deferred(overlay_center)
 
 	smash_overlay = Label.new()
 	smash_overlay.text = ""
@@ -107,7 +106,11 @@ func _build_overlay() -> void:
 	smash_overlay.add_theme_font_size_override("font_size", 38)
 	smash_overlay.add_theme_color_override("font_color", Color(0.16, 0.12, 0.08))
 	smash_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay_center.add_child.call_deferred(smash_overlay)
+	overlay_center.add_child(smash_overlay)
+
+	# Child _ready() runs before the parent's _ready(), so attach this visual layer
+	# after the current ready stack completes.
+	game.call_deferred("add_child", overlay_center)
 
 
 func _build_streams() -> void:

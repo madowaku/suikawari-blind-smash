@@ -137,9 +137,12 @@ func _play_smash_sequence(success: bool) -> void:
 
 	var result_label := game.get("result_label") as Label
 	var message_label := game.get("message_label") as Label
+	var reset_button := game.get("reset_button") as Button
 	var result_modulate := result_label.modulate
 	var message_modulate := message_label.modulate
 
+	if reset_button != null:
+		reset_button.disabled = true
 	result_label.modulate = Color(result_modulate.r, result_modulate.g, result_modulate.b, 0.0)
 	message_label.modulate = Color(message_modulate.r, message_modulate.g, message_modulate.b, 0.0)
 
@@ -173,6 +176,8 @@ func _play_smash_sequence(success: bool) -> void:
 	smash_overlay.add_theme_color_override("font_color", Color(0.16, 0.12, 0.08))
 	result_label.modulate = result_modulate
 	message_label.modulate = message_modulate
+	if reset_button != null:
+		reset_button.disabled = false
 	smash_sequence_running = false
 
 

@@ -23,7 +23,7 @@ func _init(
 	title = stage_title
 	start = start_position
 	for position in candidate_positions:
-		candidates.append(position as Vector2i)
+		candidates.append(position)
 	par = stage_par
 	stick_enabled = stage_stick_enabled
 	intro = stage_intro

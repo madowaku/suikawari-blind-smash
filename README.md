@@ -4,7 +4,7 @@ A solo deduction puzzle inspired by Japanese suikawari.
 
 ## Current prototype
 
-The prototype now contains the complete **12-stage solver-verified v0.4.1 Grant Demo core set** in a data-driven sequence.
+The prototype contains the complete **12-stage solver-verified v0.4.1 Grant Demo core set** in a data-driven sequence.
 
 - Godot 4.7 project
 - 5x5 board
@@ -21,6 +21,30 @@ The prototype now contains the complete **12-stage solver-verified v0.4.1 Grant 
 - Temporary procedural footsteps, temperature tones, KNOCK, and SMASH feedback are included
 
 The true watermelon position is never displayed before a successful smash.
+
+## SUIKAWARI UI Polish v0.1
+
+The first presentation pass is layered on top of the puzzle runtime so visual iteration stays isolated from the rules.
+
+- Runtime Godot `Theme` with a warm seaside palette
+- Dark compact HUD card for stage / PAR / turn / candidate count
+- Surface card for the current stage title and rule prompt
+- Clear selected states for direction / step / stick buttons
+- Ocean-blue **GO** and watermelon-coral **SMASH** action hierarchy
+- Result card colors for HOTTER / SAME / COLDER / KOTSU / CLEAR / MISS
+- Larger observation-log card for reasoning history
+- Subtle selected-button scale response
+- Existing result pop animation retained and visually strengthened by the result card
+
+Theme tokens:
+
+`res://src/ui_theme.gd`
+
+Non-gameplay polish layer:
+
+`res://src/ui_polish.gd`
+
+The palette direction is **sun-faded sand + paper surface + ocean blue + watermelon coral**. Typography guidance is rounded friendly headings, readable Japanese-capable body text, and monospaced move notation. Font files are not bundled yet; the current pass uses Godot's fallback font stack and focuses on hierarchy, spacing, contrast, and state feedback first.
 
 ## Locked v0.4.1 Grant Demo stages
 
@@ -49,12 +73,6 @@ Reusable data model:
 
 `res://src/stage_data.gd`
 
-Grant Demo runtime guard:
-
-`res://src/grant_demo.gd`
-
-The runtime asserts that exactly 12 stages load, IDs are sequential, all starts are C5, stick unlock happens at Stage 5, and the final stage keeps PAR 4.
-
 ## Stick orientation rule
 
 Stick side is relative to movement, not the screen:
@@ -66,7 +84,7 @@ Stick side is relative to movement, not the screen:
 | E | N | S |
 | W | S | N |
 
-The game also runs assertions for all eight direction/side mappings at startup.
+The game runs assertions for all eight direction/side mappings at startup.
 
 ## Run
 
@@ -78,17 +96,19 @@ Main scene:
 
 `res://src/main.tscn`
 
-Base game flow:
+Game flow:
 
 `res://src/main.gd`
-
-Grant Demo runtime:
-
-`res://src/grant_demo.gd`
 
 Temporary audio/feel layer:
 
 `res://src/audio_feedback.gd`
+
+UI theme and polish:
+
+`res://src/ui_theme.gd`
+
+`res://src/ui_polish.gd`
 
 ## Key smoke tests
 
@@ -141,6 +161,7 @@ All current sounds are runtime-generated placeholders. Final Kenney / itch.io / 
 
 - final authored sound assets
 - final Kenney / itch.io art
+- bundled font assets
 - watermelon burst particles / juice animation
 - full stage-select / save progression
 - post-Grant mechanics outside the locked v0.4.1 core

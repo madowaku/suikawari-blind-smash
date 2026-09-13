@@ -50,4 +50,70 @@ static func build() -> Array:
 		true,
 		"The stick is now active. Choose LEFT or RIGHT. If it brushes the watermelon mid-move, you hear KOTSU and record K1-K4."
 	))
+	stages.append(StageDataScript.new(
+		6,
+		"Switch sides",
+		Vector2i(2, 4),
+		[Vector2i(0, 3), Vector2i(1, 2), Vector2i(3, 3), Vector2i(4, 3)],
+		3,
+		true,
+		"Same sensor, different shape. Read the board before choosing which side to probe."
+	))
+	stages.append(StageDataScript.new(
+		7,
+		"Three choices",
+		Vector2i(2, 4),
+		[Vector2i(0, 3), Vector2i(1, 2), Vector2i(2, 1), Vector2i(3, 4)],
+		3,
+		true,
+		"Direction, distance, and stick side now work together as one question."
+	))
+	stages.append(StageDataScript.new(
+		8,
+		"Measure twice",
+		Vector2i(2, 4),
+		[Vector2i(0, 1), Vector2i(1, 3), Vector2i(4, 1), Vector2i(4, 4)],
+		3,
+		true,
+		"Do not assume the shortest or longest move is automatically the strongest."
+	))
+	stages.append(StageDataScript.new(
+		9,
+		"Commit",
+		Vector2i(2, 4),
+		[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 2)],
+		3,
+		true,
+		"A long commitment can be exactly the right question when the geometry supports it."
+	))
+	stages.append(StageDataScript.new(
+		10,
+		"The next square",
+		Vector2i(2, 4),
+		[Vector2i(0, 2), Vector2i(1, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 2)],
+		3,
+		true,
+		"Choose the move that leaves you ready to act on whatever answer comes back."
+	))
+	stages.append(StageDataScript.new(
+		11,
+		"Position is information",
+		Vector2i(2, 4),
+		[Vector2i(1, 0), Vector2i(1, 2), Vector2i(2, 1), Vector2i(2, 2), Vector2i(4, 0)],
+		3,
+		true,
+		"The best first move does not always split the candidates as much as possible."
+	))
+	stages.append(StageDataScript.new(
+		12,
+		"Blind Smash",
+		Vector2i(2, 4),
+		[
+			Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 0), Vector2i(2, 1),
+			Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 0), Vector2i(4, 0)
+		],
+		4,
+		true,
+		"Final exam. Use every answer, every step, and every stopping position."
+	))
 	return stages

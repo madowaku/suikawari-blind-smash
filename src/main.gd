@@ -1,5 +1,7 @@
 extends Control
 
+signal knock_detected(step_number: int)
+
 const GRID_SIZE := 5
 const START_POS := Vector2i(2, 4) # C5
 const CANDIDATES := [Vector2i(0, 4), Vector2i(4, 4)] # A5 / E5
@@ -14,17 +16,27 @@ const DIRECTIONS := {
 	"E": Vector2i(1, 0),
 }
 
+# Stick direction is relative to travel direction.
+const STICK_OFFSETS := {
+	"N": {"L": Vector2i(-1, 0), "R": Vector2i(1, 0)},
+	"S": {"L": Vector2i(1, 0), "R": Vector2i(-1, 0)},
+	"E": {"L": Vector2i(0, -1), "R": Vector2i(0, 1)},
+	"W": {"L": Vector2i(0, 1), "R": Vector2i(0, -1)},
+}
+
 var rng := RandomNumberGenerator.new()
 var player_position := START_POS
 var watermelon_position := Vector2i.ZERO
 var selected_direction := ""
 var selected_steps := 0
+var selected_stick := ""
 var turn := 0
 var phase := "input"
 
 var cell_buttons: Dictionary = {}
 var direction_buttons: Dictionary = {}
 var step_buttons: Dictionary = {}
+var stick_buttons: Dictionary = {}
 var movement_trail: Array[Vector2i] = []
 var turn_log: Array[String] = []
 
@@ -40,6 +52,7 @@ var reset_button: Button
 
 func _ready() -> void:
 	rng.randomize()
+	_run_stick_self_check()
 	_build_ui()
 	_start_stage()
 
@@ -56,37 +69,37 @@ func _build_ui() -> void:
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 24)
 	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_bottom", 18)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
 	add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 6)
 	margin.add_child(root)
 
 	var title := Label.new()
 	title.text = "SUIKAWARI: BLIND SMASH"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_font_size_override("font_size", 25)
 	root.add_child(title)
 
 	header_label = Label.new()
 	header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	header_label.add_theme_font_size_override("font_size", 17)
+	header_label.add_theme_font_size_override("font_size", 16)
 	root.add_child(header_label)
 
 	var rule := Label.new()
-	rule.text = "Stage 1: the watermelon is hidden at A5 or E5.\nCommit to a move, read the result, then SMASH."
+	rule.text = "Stage 1: the watermelon is hidden at A5 or E5.\nCommit direction + steps + stick side, read the result, then SMASH."
 	rule.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rule.add_theme_font_size_override("font_size", 14)
+	rule.add_theme_font_size_override("font_size", 13)
 	root.add_child(rule)
 
 	result_label = Label.new()
 	result_label.text = "READY"
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	result_label.custom_minimum_size = Vector2(0, 42)
-	result_label.add_theme_font_size_override("font_size", 30)
+	result_label.custom_minimum_size = Vector2(0, 40)
+	result_label.add_theme_font_size_override("font_size", 29)
 	root.add_child(result_label)
 
 	var board_center := CenterContainer.new()
@@ -100,7 +113,7 @@ func _build_ui() -> void:
 	board_center.add_child(board)
 
 	var corner := Label.new()
-	corner.custom_minimum_size = Vector2(28, 24)
+	corner.custom_minimum_size = Vector2(28, 22)
 	board.add_child(corner)
 
 	for x in range(GRID_SIZE):
@@ -108,8 +121,8 @@ func _build_ui() -> void:
 		column.text = char(65 + x)
 		column.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		column.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		column.custom_minimum_size = Vector2(64, 24)
-		column.add_theme_font_size_override("font_size", 15)
+		column.custom_minimum_size = Vector2(62, 22)
+		column.add_theme_font_size_override("font_size", 14)
 		board.add_child(column)
 
 	for y in range(GRID_SIZE):
@@ -117,72 +130,89 @@ func _build_ui() -> void:
 		row.text = str(y + 1)
 		row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		row.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.custom_minimum_size = Vector2(28, 64)
-		row.add_theme_font_size_override("font_size", 15)
+		row.custom_minimum_size = Vector2(28, 62)
+		row.add_theme_font_size_override("font_size", 14)
 		board.add_child(row)
 
 		for x in range(GRID_SIZE):
 			var pos := Vector2i(x, y)
 			var cell := Button.new()
-			cell.custom_minimum_size = Vector2(64, 64)
+			cell.custom_minimum_size = Vector2(62, 62)
 			cell.focus_mode = Control.FOCUS_NONE
 			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			cell.add_theme_font_size_override("font_size", 19)
+			cell.add_theme_font_size_override("font_size", 18)
 			cell_buttons[pos] = cell
 			board.add_child(cell)
 
 	plan_label = Label.new()
 	plan_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	plan_label.custom_minimum_size = Vector2(0, 24)
-	plan_label.add_theme_font_size_override("font_size", 15)
+	plan_label.custom_minimum_size = Vector2(0, 22)
+	plan_label.add_theme_font_size_override("font_size", 14)
 	root.add_child(plan_label)
 
 	var choice_row := HBoxContainer.new()
 	choice_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	choice_row.add_theme_constant_override("separation", 18)
+	choice_row.add_theme_constant_override("separation", 14)
 	root.add_child(choice_row)
 
 	var direction_group := VBoxContainer.new()
-	direction_group.add_theme_constant_override("separation", 4)
+	direction_group.add_theme_constant_override("separation", 3)
 	choice_row.add_child(direction_group)
 
 	var direction_title := Label.new()
 	direction_title.text = "1. Direction"
 	direction_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	direction_title.add_theme_font_size_override("font_size", 15)
+	direction_title.add_theme_font_size_override("font_size", 14)
 	direction_group.add_child(direction_title)
 
 	var direction_row := HBoxContainer.new()
 	direction_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	direction_row.add_theme_constant_override("separation", 5)
+	direction_row.add_theme_constant_override("separation", 4)
 	direction_group.add_child(direction_row)
 
 	for code in ["N", "W", "S", "E"]:
-		var button := _make_choice_button(code, Vector2(52, 42))
+		var button := _make_choice_button(code, Vector2(50, 40))
 		direction_buttons[code] = button
 		button.pressed.connect(_on_direction_pressed.bind(code))
 		direction_row.add_child(button)
 
 	var steps_group := VBoxContainer.new()
-	steps_group.add_theme_constant_override("separation", 4)
+	steps_group.add_theme_constant_override("separation", 3)
 	choice_row.add_child(steps_group)
 
 	var steps_title := Label.new()
 	steps_title.text = "2. Steps"
 	steps_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	steps_title.add_theme_font_size_override("font_size", 15)
+	steps_title.add_theme_font_size_override("font_size", 14)
 	steps_group.add_child(steps_title)
 
 	var steps_row := HBoxContainer.new()
 	steps_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	steps_row.add_theme_constant_override("separation", 5)
+	steps_row.add_theme_constant_override("separation", 4)
 	steps_group.add_child(steps_row)
 
 	for steps in range(1, 5):
-		var button := _make_choice_button(str(steps), Vector2(45, 42))
+		var button := _make_choice_button(str(steps), Vector2(43, 40))
 		step_buttons[steps] = button
 		button.pressed.connect(_on_steps_pressed.bind(steps))
 		steps_row.add_child(button)
+
+	var stick_group := HBoxContainer.new()
+	stick_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	stick_group.add_theme_constant_override("separation", 8)
+	root.add_child(stick_group)
+
+	var stick_title := Label.new()
+	stick_title.text = "3. Stick side"
+	stick_title.add_theme_font_size_override("font_size", 14)
+	stick_group.add_child(stick_title)
+
+	for side in ["L", "R"]:
+		var button := _make_choice_button(side, Vector2(76, 38))
+		button.text = "LEFT" if side == "L" else "RIGHT"
+		stick_buttons[side] = button
+		button.pressed.connect(_on_stick_pressed.bind(side))
+		stick_group.add_child(button)
 
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -191,47 +221,47 @@ func _build_ui() -> void:
 
 	go_button = Button.new()
 	go_button.text = "GO!"
-	go_button.custom_minimum_size = Vector2(140, 48)
-	go_button.add_theme_font_size_override("font_size", 21)
+	go_button.custom_minimum_size = Vector2(136, 46)
+	go_button.add_theme_font_size_override("font_size", 20)
 	go_button.pressed.connect(_on_go_pressed)
 	actions.add_child(go_button)
 
 	smash_button = Button.new()
 	smash_button.text = "SMASH"
-	smash_button.custom_minimum_size = Vector2(140, 48)
-	smash_button.add_theme_font_size_override("font_size", 21)
+	smash_button.custom_minimum_size = Vector2(136, 46)
+	smash_button.add_theme_font_size_override("font_size", 20)
 	smash_button.pressed.connect(_on_smash_pressed)
 	actions.add_child(smash_button)
 
 	reset_button = Button.new()
 	reset_button.text = "RESET"
-	reset_button.custom_minimum_size = Vector2(90, 48)
+	reset_button.custom_minimum_size = Vector2(86, 46)
 	reset_button.pressed.connect(_start_stage)
 	actions.add_child(reset_button)
 
 	message_label = Label.new()
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	message_label.custom_minimum_size = Vector2(0, 42)
-	message_label.add_theme_font_size_override("font_size", 14)
+	message_label.custom_minimum_size = Vector2(0, 40)
+	message_label.add_theme_font_size_override("font_size", 13)
 	root.add_child(message_label)
 
 	var log_title := Label.new()
 	log_title.text = "OBSERVATION LOG"
-	log_title.add_theme_font_size_override("font_size", 14)
+	log_title.add_theme_font_size_override("font_size", 13)
 	root.add_child(log_title)
 
 	log_label = Label.new()
 	log_label.text = "No observations yet."
-	log_label.custom_minimum_size = Vector2(0, 64)
+	log_label.custom_minimum_size = Vector2(0, 60)
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	log_label.add_theme_font_size_override("font_size", 14)
+	log_label.add_theme_font_size_override("font_size", 13)
 	root.add_child(log_label)
 
 	var footer := Label.new()
-	footer.text = "Stage 1 feel slice / stick sensor comes later"
+	footer.text = "Stick sensor active: K1-K4 records the contact step"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	footer.add_theme_font_size_override("font_size", 12)
+	footer.add_theme_font_size_override("font_size", 11)
 	root.add_child(footer)
 
 
@@ -240,7 +270,7 @@ func _make_choice_button(text_value: String, minimum_size: Vector2) -> Button:
 	button.text = text_value
 	button.toggle_mode = true
 	button.custom_minimum_size = minimum_size
-	button.add_theme_font_size_override("font_size", 17)
+	button.add_theme_font_size_override("font_size", 16)
 	return button
 
 
@@ -249,6 +279,7 @@ func _start_stage() -> void:
 	watermelon_position = CANDIDATES[rng.randi_range(0, CANDIDATES.size() - 1)]
 	selected_direction = ""
 	selected_steps = 0
+	selected_stick = ""
 	turn = 0
 	phase = "input"
 	movement_trail.clear()
@@ -257,7 +288,7 @@ func _start_stage() -> void:
 	result_label.modulate = Color.WHITE
 	result_label.scale = Vector2.ONE
 	result_label.add_theme_color_override("font_color", Color(0.18, 0.20, 0.24))
-	message_label.text = "Choose a direction and 1-4 steps. The true watermelon stays hidden."
+	message_label.text = "Choose direction, 1-4 steps, and LEFT/RIGHT stick side."
 	_update_log_label()
 	_refresh_ui()
 
@@ -278,21 +309,30 @@ func _on_steps_pressed(steps: int) -> void:
 	_refresh_ui()
 
 
+func _on_stick_pressed(side: String) -> void:
+	if phase != "input":
+		return
+	selected_stick = side
+	_refresh_ui()
+
+
 func _on_go_pressed() -> void:
 	if phase != "input" or not _selection_is_valid():
 		return
 
 	var input_direction := selected_direction
 	var input_steps := selected_steps
+	var input_stick := selected_stick
 	var start := player_position
 	var start_distance := _manhattan(start, watermelon_position)
 	var delta: Vector2i = DIRECTIONS[input_direction]
+	var knock_step := -1
 
 	phase = "moving"
 	movement_trail.clear()
 	result_label.text = "MOVING..."
 	result_label.add_theme_color_override("font_color", Color(0.24, 0.31, 0.38))
-	message_label.text = "Committed. You cannot stop until all %d step(s) are complete." % input_steps
+	message_label.text = "Committed %s%d%s. You cannot stop mid-move." % [input_direction, input_steps, input_stick]
 	_refresh_ui()
 
 	await get_tree().create_timer(0.08).timeout
@@ -300,19 +340,30 @@ func _on_go_pressed() -> void:
 	for step_index in range(input_steps):
 		player_position += delta
 		movement_trail.append(player_position)
-		message_label.text = "Step %d / %d" % [step_index + 1, input_steps]
+		var current_step := step_index + 1
+
+		if knock_step < 0 and _stick_touches_watermelon(player_position, input_direction, input_stick):
+			knock_step = current_step
+			result_label.text = "KOTSU!  K%d" % knock_step
+			result_label.add_theme_color_override("font_color", Color(0.86, 0.48, 0.08))
+			message_label.text = "KOTSU! The stick touched something on step %d. Keep moving." % knock_step
+			knock_detected.emit(knock_step)
+		else:
+			message_label.text = "Step %d / %d" % [current_step, input_steps]
+
 		_update_board()
 		await get_tree().create_timer(STEP_DURATION).timeout
 
 	var end_distance := _manhattan(player_position, watermelon_position)
 	turn += 1
 	var temperature := _temperature_from_distances(start_distance, end_distance)
-	_append_log(turn, input_direction, input_steps, temperature)
-	_show_temperature(temperature)
+	_append_log(turn, input_direction, input_steps, input_stick, temperature, knock_step)
+	_show_temperature(temperature, knock_step)
 
 	phase = "showing_result"
 	selected_direction = ""
 	selected_steps = 0
+	selected_stick = ""
 	_refresh_ui()
 	await _play_result_pop()
 
@@ -356,8 +407,8 @@ func _temperature_from_distances(start_distance: int, end_distance: int) -> Stri
 	return "SAME"
 
 
-func _show_temperature(temperature: String) -> void:
-	result_label.text = temperature
+func _show_temperature(temperature: String, knock_step: int) -> void:
+	result_label.text = temperature if knock_step < 0 else "%s + K%d" % [temperature, knock_step]
 	match temperature:
 		"HOTTER":
 			result_label.add_theme_color_override("font_color", Color(0.86, 0.22, 0.12))
@@ -368,6 +419,9 @@ func _show_temperature(temperature: String) -> void:
 		_:
 			result_label.add_theme_color_override("font_color", Color(0.40, 0.40, 0.40))
 			message_label.text = "SAME: your distance to the watermelon did not change."
+
+	if knock_step >= 0:
+		message_label.text += " Stick contact: K%d." % knock_step
 
 
 func _play_result_pop() -> void:
@@ -381,8 +435,9 @@ func _play_result_pop() -> void:
 	await get_tree().create_timer(RESULT_HOLD).timeout
 
 
-func _append_log(turn_number: int, direction: String, steps: int, temperature: String) -> void:
-	turn_log.append("T%d   %s%d  ->  %s" % [turn_number, direction, steps, temperature])
+func _append_log(turn_number: int, direction: String, steps: int, stick: String, temperature: String, knock_step: int) -> void:
+	var knock_text := "" if knock_step < 0 else " + K%d" % knock_step
+	turn_log.append("T%d   %s%d%s  ->  %s%s" % [turn_number, direction, steps, stick, temperature, knock_text])
 	if turn_log.size() > 4:
 		turn_log.pop_front()
 	_update_log_label()
@@ -420,6 +475,9 @@ func _update_choice_buttons() -> void:
 	for steps in step_buttons:
 		step_buttons[steps].button_pressed = steps == selected_steps
 		step_buttons[steps].disabled = not input_enabled
+	for side in stick_buttons:
+		stick_buttons[side].button_pressed = side == selected_stick
+		stick_buttons[side].disabled = not input_enabled
 
 
 func _update_plan() -> void:
@@ -435,11 +493,11 @@ func _update_plan() -> void:
 	if phase == "fail":
 		plan_label.text = "Missed. Reset to reshuffle the hidden watermelon."
 		return
-	if selected_direction == "" or selected_steps == 0:
-		plan_label.text = "Plan: choose direction + steps"
+	if selected_direction == "" or selected_steps == 0 or selected_stick == "":
+		plan_label.text = "Plan: choose direction + steps + stick side"
 		return
 	if _selection_is_valid():
-		plan_label.text = "Plan: %s%d  ->  %s" % [selected_direction, selected_steps, _coord_name(_get_end_position(player_position, selected_direction, selected_steps))]
+		plan_label.text = "Plan: %s%d%s  ->  %s" % [selected_direction, selected_steps, selected_stick, _coord_name(_get_end_position(player_position, selected_direction, selected_steps))]
 	else:
 		plan_label.text = "That move would leave the 5x5 beach."
 
@@ -513,7 +571,7 @@ func _update_action_buttons() -> void:
 
 
 func _selection_is_valid() -> bool:
-	if selected_direction == "" or selected_steps <= 0:
+	if selected_direction == "" or selected_steps <= 0 or selected_stick == "":
 		return false
 	var pos := player_position
 	var delta: Vector2i = DIRECTIONS[selected_direction]
@@ -540,6 +598,26 @@ func _get_preview_positions() -> Array[Vector2i]:
 
 func _get_end_position(start: Vector2i, direction: String, steps: int) -> Vector2i:
 	return start + DIRECTIONS[direction] * steps
+
+
+func _get_stick_probe_position(position: Vector2i, direction: String, stick: String) -> Vector2i:
+	var offset: Vector2i = STICK_OFFSETS[direction][stick]
+	return position + offset
+
+
+func _stick_touches_watermelon(position: Vector2i, direction: String, stick: String) -> bool:
+	return _get_stick_probe_position(position, direction, stick) == watermelon_position
+
+
+func _run_stick_self_check() -> void:
+	assert(_get_stick_probe_position(Vector2i(2, 2), "N", "L") == Vector2i(1, 2))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "N", "R") == Vector2i(3, 2))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "S", "L") == Vector2i(3, 2))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "S", "R") == Vector2i(1, 2))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "E", "L") == Vector2i(2, 1))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "E", "R") == Vector2i(2, 3))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "W", "L") == Vector2i(2, 3))
+	assert(_get_stick_probe_position(Vector2i(2, 2), "W", "R") == Vector2i(2, 1))
 
 
 func _inside_board(pos: Vector2i) -> bool:

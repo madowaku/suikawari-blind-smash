@@ -4,42 +4,56 @@ A solo deduction puzzle inspired by Japanese suikawari.
 
 ## Current prototype
 
-The prototype now contains the first **five solver-verified v0.4.1 stages** in a data-driven sequence.
+The prototype now contains the complete **12-stage solver-verified v0.4.1 Grant Demo core set** in a data-driven sequence.
 
 - Godot 4.7 project
 - 5x5 board
-- Player starts at **C5** in Stages 1-5
+- Player starts at **C5** in all 12 Grant Demo stages
 - Hidden watermelon is randomized among each stage's candidate positions
 - Choose a direction and **1-4 steps**
 - Press **GO** to commit
 - Movement resolves one tile at a time at 0.20 seconds per step
 - Read **HOTTER / SAME / COLDER** after stopping
+- From Stage 5 onward, choose **LEFT / RIGHT** stick side and listen for **KOTSU / K1-K4**
 - Each completed move is written to the observation log
 - Stand on the candidate you believe is correct and press **SMASH**
-- Clear a stage and the RESET button becomes **NEXT**
+- Successful SMASH advances through all 12 stages; Stage 12 ends on **REPLAY**
 - Temporary procedural footsteps, temperature tones, KNOCK, and SMASH feedback are included
 
 The true watermelon position is never displayed before a successful smash.
 
-## v0.4.1 stages currently implemented
+## Locked v0.4.1 Grant Demo stages
 
-| Stage | Candidates | PAR | Stick | Intended discovery |
+| Stage | Candidates | PAR | Stick | Solver-verified best opening |
 | --- | --- | ---: | --- | --- |
-| 1 | A5 / E5 | 2 | Off | Moving is a question |
-| 2 | A1 / C4 / E5 | 3 | Off | SAME is useful information |
-| 3 | A1 / A4 / C2 / D5 | 3 | Off | Step count is part of the question |
-| 4 | A2 / D2 / D3 | 3 | Off | The best question is not always north |
-| 5 | A4 / B4 / D3 / E4 | 3 | **On** | First real KNOCK puzzle |
+| 1 | A5 / E5 | 2 | Off | Tutorial ties |
+| 2 | A1 / C4 / E5 | 3 | Off | N1 / N2 tie |
+| 3 | A1 / A4 / C2 / D5 | 3 | Off | **N2** |
+| 4 | A2 / D2 / D3 | 3 | Off | **E1** |
+| 5 | A4 / B4 / D3 / E4 | 3 | On | **N1L** |
+| 6 | A4 / B3 / D4 / E4 | 3 | On | **N1R** |
+| 7 | A4 / B3 / C2 / D5 | 3 | On | **N2L** |
+| 8 | A2 / B4 / E2 / E5 | 3 | On | **N3L** |
+| 9 | A1 / A2 / B2 / C3 | 3 | On | **N4L** |
+| 10 | A3 / B2 / C3 / C4 / D3 | 3 | On | **N2R** |
+| 11 | B1 / B3 / C2 / C3 / E1 | 3 | On | **N2L** |
+| 12 | A1 / A2 / B1 / C2 / C3 / C4 / D1 / E1 | 4 | On | **N4R** |
 
-Stages 1-4 deliberately hide the stick controls. Stage 5 reveals LEFT / RIGHT as a new third input.
+Stages 1-4 deliberately hide the stick controls. Stage 5 reveals LEFT / RIGHT as the third committed input. Stages 10-11 are intentionally designed so that maximizing immediate information is not always the optimal strategy; stopping position matters too.
 
-Stage definitions live in:
+Stage definitions:
 
 `res://src/stage_catalog.gd`
 
-Reusable stage data model:
+Reusable data model:
 
 `res://src/stage_data.gd`
+
+Grant Demo runtime guard:
+
+`res://src/grant_demo.gd`
+
+The runtime asserts that exactly 12 stages load, IDs are sequential, all starts are C5, stick unlock happens at Stage 5, and the final stage keeps PAR 4.
 
 ## Stick orientation rule
 
@@ -52,38 +66,42 @@ Stick side is relative to movement, not the screen:
 | E | N | S |
 | W | S | N |
 
-The game runs assertions for all eight direction/side mappings at startup.
+The game also runs assertions for all eight direction/side mappings at startup.
 
 ## Run
 
 1. Open the repository folder in Godot 4.7.
 2. Run the project (`F5`).
-3. Clear Stages 1-4 to reach the first KNOCK puzzle in Stage 5.
+3. Clear each stage with SMASH; the action button becomes **NEXT** through Stage 11 and **REPLAY** after Stage 12.
 
 Main scene:
 
 `res://src/main.tscn`
 
-Main game flow:
+Base game flow:
 
 `res://src/main.gd`
+
+Grant Demo runtime:
+
+`res://src/grant_demo.gd`
 
 Temporary audio/feel layer:
 
 `res://src/audio_feedback.gd`
 
-## Smoke tests
+## Key smoke tests
 
-### Stage 1
+### Stage 1 temperature tutorial
 
-A guaranteed opening is **E2** from C5:
+From C5 use **E2**:
 
 - Watermelon A5 -> **COLDER**
-- Watermelon E5 -> **HOTTER**, and the player ends on E5 ready to SMASH
+- Watermelon E5 -> **HOTTER**, ending on E5 ready to SMASH
 
-If the result is COLDER, use **W4**, then SMASH at A5. This guarantees a clear within PAR 2.
+If COLDER, use **W4**, then SMASH at A5. This guarantees PAR 2.
 
-### Stage 2 sensor check
+### Stage 2 three-value sensor
 
 Use **N2** from C5:
 
@@ -91,18 +109,22 @@ Use **N2** from C5:
 - C4 -> SAME
 - E5 -> COLDER
 
-This verifies the three-value temperature sensor.
+### Stage 5 first KNOCK puzzle
 
-### Stage 5 KNOCK check
-
-The first intended move is **N1L** from C5.
+Use **N1L** from C5:
 
 - B4 -> **HOTTER + K1** and the wooden `KOTSU!` cue fires
 - A4 / D3 / E4 -> HOTTER with no KNOCK
 
-Because the hidden watermelon is randomized, reset/replay Stage 5 until the B4 branch appears when specifically smoke-testing KNOCK.
+Contact does **not** stop movement. K1-K4 records which committed step produced the contact.
 
-The important behavior is that contact does **not** stop movement. For longer later-stage moves, K1-K4 records which committed step produced the contact.
+### Late-stage regression openings
+
+The solver audit for the locked data expects:
+
+`S6 N1R / S7 N2L / S8 N3L / S9 N4L / S10 N2R / S11 N2L / S12 N4R`
+
+Stages 3-12 each have the intended unique best opening. Stage 1 is deliberately tutorial-like; Stage 2 deliberately permits N1/N2 as equivalent best openings.
 
 ## Current feel loop
 
@@ -111,7 +133,7 @@ The important behavior is that contact does **not** stop movement. For longer la
 3. **Knock**: when active, side contact produces `KOTSU! Kx` immediately but movement continues.
 4. **Observe**: HOTTER / SAME / COLDER appears after stopping and combines with `+ Kx` when relevant.
 5. **Smash**: READY -> SWING -> SMASH/SWISH creates the decision-release beat.
-6. **Progress**: successful SMASH advances to the next stage.
+6. **Progress**: successful SMASH advances through the complete 12-stage Grant Demo curve.
 
 All current sounds are runtime-generated placeholders. Final Kenney / itch.io / custom audio can replace them without changing puzzle rules.
 
@@ -120,10 +142,8 @@ All current sounds are runtime-generated placeholders. Final Kenney / itch.io / 
 - final authored sound assets
 - final Kenney / itch.io art
 - watermelon burst particles / juice animation
-- Stages 6-12
-- full stage select / save progression
-
-The data-driven core is now ready to extend through the rest of the locked v0.4.1 set.
+- full stage-select / save progression
+- post-Grant mechanics outside the locked v0.4.1 core
 
 ## Core principle
 

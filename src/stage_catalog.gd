@@ -75,7 +75,7 @@ static func build() -> Array:
 		[Vector2i(0, 1), Vector2i(1, 3), Vector2i(4, 1), Vector2i(4, 4)],
 		3,
 		true,
-		"Do not assume the shortest or longest move is automatically the strongest."
+		"Four candidates, one commitment. Read the geometry before moving."
 	))
 	stages.append(StageDataScript.new(
 		9,
@@ -84,25 +84,25 @@ static func build() -> Array:
 		[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 2)],
 		3,
 		true,
-		"A long commitment can be exactly the right question when the geometry supports it."
+		"The candidates are tightly clustered. Choose your question carefully."
 	))
 	stages.append(StageDataScript.new(
 		10,
-		"The next square",
+		"Crossroads",
 		Vector2i(2, 4),
 		[Vector2i(0, 2), Vector2i(1, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 2)],
 		3,
 		true,
-		"Choose the move that leaves you ready to act on whatever answer comes back."
+		"Five candidates now. Keep the whole board in mind."
 	))
 	stages.append(StageDataScript.new(
 		11,
-		"Position is information",
+		"Five marks",
 		Vector2i(2, 4),
 		[Vector2i(1, 0), Vector2i(1, 2), Vector2i(2, 1), Vector2i(2, 2), Vector2i(4, 0)],
 		3,
 		true,
-		"The best first move does not always split the candidates as much as possible."
+		"Another five-candidate board. Trust the rules, not a habit."
 	))
 	stages.append(StageDataScript.new(
 		12,

@@ -14,7 +14,6 @@ const DIRECTIONS := {
 	"E": Vector2i(1, 0),
 }
 
-# Stick direction is relative to travel direction.
 const STICK_OFFSETS := {
 	"N": {"L": Vector2i(-1, 0), "R": Vector2i(1, 0)},
 	"S": {"L": Vector2i(1, 0), "R": Vector2i(-1, 0)},
@@ -53,7 +52,6 @@ var go_button: Button
 var smash_button: Button
 var reset_button: Button
 
-
 func _ready() -> void:
 	rng.randomize()
 	_run_stick_self_check()
@@ -61,7 +59,6 @@ func _ready() -> void:
 	current_stage = stages[stage_index]
 	_build_ui()
 	_start_stage()
-
 
 func _build_ui() -> void:
 	var background := ColorRect.new()
@@ -268,7 +265,6 @@ func _build_ui() -> void:
 	footer_label.add_theme_font_size_override("font_size", 11)
 	root.add_child(footer_label)
 
-
 func _make_choice_button(text_value: String, minimum_size: Vector2) -> Button:
 	var button := Button.new()
 	button.text = text_value
@@ -276,7 +272,6 @@ func _make_choice_button(text_value: String, minimum_size: Vector2) -> Button:
 	button.custom_minimum_size = minimum_size
 	button.add_theme_font_size_override("font_size", 16)
 	return button
-
 
 func _start_stage() -> void:
 	current_stage = stages[stage_index]
@@ -301,7 +296,6 @@ func _start_stage() -> void:
 	_update_log_label()
 	_refresh_ui()
 
-
 func _on_reset_pressed() -> void:
 	if phase == "clear":
 		if stage_index < stages.size() - 1:
@@ -310,14 +304,12 @@ func _on_reset_pressed() -> void:
 		return
 	_start_stage()
 
-
 func _on_direction_pressed(code: String) -> void:
 	if phase != "input":
 		return
 	movement_trail.clear()
 	selected_direction = code
 	_refresh_ui()
-
 
 func _on_steps_pressed(steps: int) -> void:
 	if phase != "input":
@@ -326,18 +318,15 @@ func _on_steps_pressed(steps: int) -> void:
 	selected_steps = steps
 	_refresh_ui()
 
-
 func _on_stick_pressed(side: String) -> void:
 	if phase != "input" or not current_stage.stick_enabled:
 		return
 	selected_stick = side
 	_refresh_ui()
 
-
 func _on_go_pressed() -> void:
 	if phase != "input" or not _selection_is_valid():
 		return
-
 	var input_direction := selected_direction
 	var input_steps := selected_steps
 	var input_stick := selected_stick
@@ -345,7 +334,6 @@ func _on_go_pressed() -> void:
 	var start_distance := _manhattan(start, watermelon_position)
 	var delta: Vector2i = DIRECTIONS[input_direction]
 	var knock_step := -1
-
 	phase = "moving"
 	movement_trail.clear()
 	result_label.text = "MOVING..."
@@ -353,14 +341,11 @@ func _on_go_pressed() -> void:
 	var action_name := "%s%d%s" % [input_direction, input_steps, input_stick] if current_stage.stick_enabled else "%s%d" % [input_direction, input_steps]
 	message_label.text = "Committed %s. You cannot stop mid-move." % action_name
 	_refresh_ui()
-
 	await get_tree().create_timer(0.08).timeout
-
 	for step_index in range(input_steps):
 		player_position += delta
 		movement_trail.append(player_position)
 		var current_step := step_index + 1
-
 		if current_stage.stick_enabled and knock_step < 0 and _stick_touches_watermelon(player_position, input_direction, input_stick):
 			knock_step = current_step
 			result_label.text = "KOTSU!  K%d" % knock_step
@@ -369,34 +354,27 @@ func _on_go_pressed() -> void:
 			knock_detected.emit(knock_step)
 		else:
 			message_label.text = "Step %d / %d" % [current_step, input_steps]
-
 		_update_board()
 		await get_tree().create_timer(STEP_DURATION).timeout
-
 	var end_distance := _manhattan(player_position, watermelon_position)
 	turn += 1
 	var temperature := _temperature_from_distances(start_distance, end_distance)
 	_append_log(turn, input_direction, input_steps, input_stick, temperature, knock_step)
 	_show_temperature(temperature, knock_step)
-
 	phase = "showing_result"
 	selected_direction = ""
 	selected_steps = 0
 	selected_stick = ""
 	_refresh_ui()
 	await _play_result_pop()
-
 	phase = "input"
 	_refresh_ui()
-
 
 func _on_smash_pressed() -> void:
 	if phase != "input" or not _is_candidate(player_position):
 		return
-
 	phase = "smashing"
 	_refresh_ui()
-
 	if player_position == watermelon_position:
 		phase = "clear"
 		result_label.text = "SMASH! CLEAR"
@@ -414,9 +392,7 @@ func _on_smash_pressed() -> void:
 		result_label.scale = Vector2.ONE
 		result_label.add_theme_color_override("font_color", Color(0.58, 0.18, 0.18))
 		message_label.text = "No watermelon here. RESET and use the observations to try again."
-
 	_refresh_ui()
-
 
 func _temperature_from_distances(start_distance: int, end_distance: int) -> String:
 	if end_distance < start_distance:
@@ -424,7 +400,6 @@ func _temperature_from_distances(start_distance: int, end_distance: int) -> Stri
 	if end_distance > start_distance:
 		return "COLDER"
 	return "SAME"
-
 
 func _show_temperature(temperature: String, knock_step: int) -> void:
 	result_label.text = temperature if knock_step < 0 else "%s + K%d" % [temperature, knock_step]
@@ -438,10 +413,8 @@ func _show_temperature(temperature: String, knock_step: int) -> void:
 		_:
 			result_label.add_theme_color_override("font_color", Color(0.40, 0.40, 0.40))
 			message_label.text = "SAME: your distance to the watermelon did not change."
-
 	if knock_step >= 0:
 		message_label.text += " Stick contact: K%d." % knock_step
-
 
 func _play_result_pop() -> void:
 	result_label.modulate = Color(1, 1, 1, 0)
@@ -453,7 +426,6 @@ func _play_result_pop() -> void:
 	await tween.finished
 	await get_tree().create_timer(RESULT_HOLD).timeout
 
-
 func _append_log(turn_number: int, direction: String, steps: int, stick: String, temperature: String, knock_step: int) -> void:
 	var action_name := "%s%d%s" % [direction, steps, stick] if current_stage.stick_enabled else "%s%d" % [direction, steps]
 	var knock_text := "" if knock_step < 0 else " + K%d" % knock_step
@@ -461,7 +433,6 @@ func _append_log(turn_number: int, direction: String, steps: int, stick: String,
 	if turn_log.size() > 4:
 		turn_log.pop_front()
 	_update_log_label()
-
 
 func _update_log_label() -> void:
 	if turn_log.is_empty():
@@ -474,7 +445,6 @@ func _update_log_label() -> void:
 		text += turn_log[index]
 	log_label.text = text
 
-
 func _refresh_ui() -> void:
 	_update_header()
 	_update_choice_buttons()
@@ -482,10 +452,8 @@ func _refresh_ui() -> void:
 	_update_board()
 	_update_action_buttons()
 
-
 func _update_header() -> void:
-	header_label.text = "STAGE %d/5   |   PAR %d   |   TURN %d   |   CANDIDATES %d" % [current_stage.id, current_stage.par, turn, current_stage.candidates.size()]
-
+	header_label.text = "STAGE %d/%d   |   PAR %d   |   TURN %d   |   CANDIDATES %d" % [current_stage.id, stages.size(), current_stage.par, turn, current_stage.candidates.size()]
 
 func _update_choice_buttons() -> void:
 	var input_enabled := phase == "input"
@@ -498,7 +466,6 @@ func _update_choice_buttons() -> void:
 	for side in stick_buttons:
 		stick_buttons[side].button_pressed = side == selected_stick
 		stick_buttons[side].disabled = not input_enabled or not current_stage.stick_enabled
-
 
 func _update_plan() -> void:
 	if phase == "moving":
@@ -513,18 +480,15 @@ func _update_plan() -> void:
 	if phase == "fail":
 		plan_label.text = "Missed. Reset to reshuffle the hidden watermelon."
 		return
-
-	var missing_stick := current_stage.stick_enabled and selected_stick == ""
+	var missing_stick: bool = bool(current_stage.stick_enabled) and selected_stick == ""
 	if selected_direction == "" or selected_steps == 0 or missing_stick:
 		plan_label.text = "Plan: direction + steps + stick side" if current_stage.stick_enabled else "Plan: direction + steps"
 		return
-
 	if _selection_is_valid():
 		var action_name := "%s%d%s" % [selected_direction, selected_steps, selected_stick] if current_stage.stick_enabled else "%s%d" % [selected_direction, selected_steps]
 		plan_label.text = "Plan: %s  ->  %s" % [action_name, _coord_name(_get_end_position(player_position, selected_direction, selected_steps))]
 	else:
 		plan_label.text = "That move would leave the 5x5 beach."
-
 
 func _update_board() -> void:
 	var preview := _get_preview_positions()
@@ -535,16 +499,13 @@ func _update_board() -> void:
 			var is_candidate := _is_candidate(pos)
 			var is_player := pos == player_position
 			var text_value := ""
-
 			if is_candidate:
 				text_value = "?"
 			if is_player:
 				text_value = "P ?" if is_candidate else "P"
 			if phase == "clear" and pos == watermelon_position:
 				text_value = "P / W" if is_player else "W"
-
 			cell.text = text_value
-
 			var color := Color(0.96, 0.88, 0.68)
 			if is_candidate:
 				color = Color(1.00, 0.82, 0.38)
@@ -556,9 +517,7 @@ func _update_board() -> void:
 				color = Color(0.36, 0.67, 0.90)
 			if phase == "clear" and pos == watermelon_position:
 				color = Color(0.42, 0.82, 0.48)
-
 			_apply_cell_style(cell, color)
-
 
 func _apply_cell_style(cell: Button, color: Color) -> void:
 	var style := StyleBoxFlat.new()
@@ -580,24 +539,19 @@ func _apply_cell_style(cell: Button, color: Color) -> void:
 	cell.add_theme_color_override("font_hover_color", Color(0.12, 0.14, 0.17))
 	cell.add_theme_color_override("font_pressed_color", Color(0.12, 0.14, 0.17))
 
-
 func _update_action_buttons() -> void:
 	var busy := phase == "moving" or phase == "showing_result" or phase == "smashing"
 	reset_button.disabled = busy
-
 	if phase == "clear":
 		reset_button.text = "NEXT" if stage_index < stages.size() - 1 else "REPLAY"
 	else:
 		reset_button.text = "RESET"
-
 	if phase != "input":
 		go_button.disabled = true
 		smash_button.disabled = true
 		return
-
 	go_button.disabled = not _selection_is_valid()
 	smash_button.disabled = not _is_candidate(player_position)
-
 
 func _selection_is_valid() -> bool:
 	if selected_direction == "" or selected_steps <= 0:
@@ -612,7 +566,6 @@ func _selection_is_valid() -> bool:
 			return false
 	return true
 
-
 func _get_preview_positions() -> Array[Vector2i]:
 	var positions: Array[Vector2i] = []
 	if phase != "input" or selected_direction == "" or selected_steps <= 0:
@@ -626,19 +579,15 @@ func _get_preview_positions() -> Array[Vector2i]:
 		positions.append(pos)
 	return positions
 
-
 func _get_end_position(start: Vector2i, direction: String, steps: int) -> Vector2i:
 	return start + DIRECTIONS[direction] * steps
-
 
 func _get_stick_probe_position(position: Vector2i, direction: String, stick: String) -> Vector2i:
 	var offset: Vector2i = STICK_OFFSETS[direction][stick]
 	return position + offset
 
-
 func _stick_touches_watermelon(position: Vector2i, direction: String, stick: String) -> bool:
 	return _get_stick_probe_position(position, direction, stick) == watermelon_position
-
 
 func _run_stick_self_check() -> void:
 	assert(_get_stick_probe_position(Vector2i(2, 2), "N", "L") == Vector2i(1, 2))
@@ -650,18 +599,14 @@ func _run_stick_self_check() -> void:
 	assert(_get_stick_probe_position(Vector2i(2, 2), "W", "L") == Vector2i(2, 3))
 	assert(_get_stick_probe_position(Vector2i(2, 2), "W", "R") == Vector2i(2, 1))
 
-
 func _inside_board(pos: Vector2i) -> bool:
 	return pos.x >= 0 and pos.x < GRID_SIZE and pos.y >= 0 and pos.y < GRID_SIZE
-
 
 func _is_candidate(pos: Vector2i) -> bool:
 	return pos in current_stage.candidates
 
-
 func _manhattan(a: Vector2i, b: Vector2i) -> int:
 	return absi(a.x - b.x) + absi(a.y - b.y)
-
 
 func _coord_name(pos: Vector2i) -> String:
 	return "%s%d" % [char(65 + pos.x), pos.y + 1]

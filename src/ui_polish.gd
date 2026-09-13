@@ -9,6 +9,9 @@ var last_result_text := ""
 var direction_buttons = {}
 var step_buttons = {}
 var stick_buttons = {}
+var heading_font: Font
+var body_font: Font
+var mono_font: Font
 
 
 func _ready() -> void:
@@ -33,6 +36,9 @@ func _apply_polish() -> void:
 	if header_label == null or rule_label == null or result_label == null or log_label == null:
 		return
 
+	heading_font = UITheme.heading_font()
+	body_font = UITheme.body_font()
+	mono_font = UITheme.mono_font()
 	game.theme = UITheme.build_theme()
 	_style_background()
 	_style_title()
@@ -46,11 +52,11 @@ func _apply_polish() -> void:
 	step_buttons = game.get("step_buttons")
 	stick_buttons = game.get("stick_buttons")
 	for button in direction_buttons.values():
-		_style_choice_button(button as Button)
+		_style_choice_button(button as Button, true)
 	for button in step_buttons.values():
-		_style_choice_button(button as Button)
+		_style_choice_button(button as Button, true)
 	for button in stick_buttons.values():
-		_style_choice_button(button as Button)
+		_style_choice_button(button as Button, false)
 
 	_style_primary_action(go_button)
 	_style_smash_action(smash_button)
@@ -80,36 +86,41 @@ func _style_title() -> void:
 	var title := _find_label(game, "SUIKAWARI: BLIND SMASH")
 	if title == null:
 		return
+	title.add_theme_font_override("font", heading_font)
 	title.add_theme_color_override("font_color", UITheme.FOREGROUND)
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 22)
 
 
 func _style_hud(header_label: Label, rule_label: Label) -> void:
-	header_label.custom_minimum_size = Vector2(0, 38)
+	header_label.custom_minimum_size = Vector2(0, 34)
+	header_label.add_theme_font_override("font", mono_font)
 	header_label.add_theme_color_override("font_color", UITheme.SURFACE)
-	header_label.add_theme_font_size_override("font_size", 14)
-	header_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.FOREGROUND, UITheme.FOREGROUND, 14, 0, 9))
+	header_label.add_theme_font_size_override("font_size", 13)
+	header_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.FOREGROUND, UITheme.FOREGROUND, 14, 0, 8))
 
-	rule_label.custom_minimum_size = Vector2(0, 58)
+	rule_label.custom_minimum_size = Vector2(0, 52)
+	rule_label.add_theme_font_override("font", body_font)
 	rule_label.add_theme_color_override("font_color", UITheme.FOREGROUND)
 	rule_label.add_theme_font_size_override("font_size", 13)
 	rule_label.add_theme_constant_override("line_spacing", 2)
-	rule_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE, UITheme.BORDER, 12, 1, 10))
+	rule_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE, UITheme.BORDER, 12, 1, 9))
 
 
 func _style_plan(plan_label: Label) -> void:
 	if plan_label == null:
 		return
-	plan_label.custom_minimum_size = Vector2(0, 36)
+	plan_label.custom_minimum_size = Vector2(0, 34)
+	plan_label.add_theme_font_override("font", mono_font)
 	plan_label.add_theme_color_override("font_color", UITheme.FOREGROUND)
-	plan_label.add_theme_font_size_override("font_size", 14)
+	plan_label.add_theme_font_size_override("font_size", 13)
 	plan_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE_MUTED, Color(0, 0, 0, 0), 10, 0, 7))
 
 
 func _style_message(message_label: Label) -> void:
 	if message_label == null:
 		return
-	message_label.custom_minimum_size = Vector2(0, 44)
+	message_label.custom_minimum_size = Vector2(0, 40)
+	message_label.add_theme_font_override("font", body_font)
 	message_label.add_theme_color_override("font_color", UITheme.FOREGROUND_MUTED)
 	message_label.add_theme_font_size_override("font_size", 13)
 
@@ -117,26 +128,30 @@ func _style_message(message_label: Label) -> void:
 func _style_log(log_label: Label) -> void:
 	var log_title := _find_label(game, "OBSERVATION LOG")
 	if log_title != null:
+		log_title.add_theme_font_override("font", heading_font)
 		log_title.add_theme_color_override("font_color", UITheme.FOREGROUND_MUTED)
 		log_title.add_theme_font_size_override("font_size", 12)
 		log_title.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE_MUTED, UITheme.BORDER, 10, 1, 7))
-	log_label.custom_minimum_size = Vector2(0, 102)
+	log_label.custom_minimum_size = Vector2(0, 96)
+	log_label.add_theme_font_override("font", mono_font)
 	log_label.add_theme_color_override("font_color", UITheme.FOREGROUND)
-	log_label.add_theme_font_size_override("font_size", 14)
-	log_label.add_theme_constant_override("line_spacing", 4)
+	log_label.add_theme_font_size_override("font_size", 13)
+	log_label.add_theme_constant_override("line_spacing", 5)
 	log_label.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE, UITheme.BORDER, 12, 1, 10))
 
 
 func _style_footer(footer_label: Label) -> void:
 	if footer_label == null:
 		return
+	footer_label.add_theme_font_override("font", body_font)
 	footer_label.add_theme_color_override("font_color", UITheme.FOREGROUND_MUTED)
 	footer_label.add_theme_font_size_override("font_size", 11)
 
 
-func _style_choice_button(button: Button) -> void:
+func _style_choice_button(button: Button, use_mono: bool) -> void:
 	if button == null:
 		return
+	button.add_theme_font_override("font", mono_font if use_mono else body_font)
 	button.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE, UITheme.BORDER, 10, 1, 7))
 	button.add_theme_stylebox_override("hover", UITheme.box(Color("fffdf6"), UITheme.PRIMARY, 10, 1, 7))
 	button.add_theme_stylebox_override("pressed", UITheme.box(UITheme.PRIMARY, UITheme.PRIMARY_DARK, 10, 2, 7))
@@ -150,6 +165,7 @@ func _style_choice_button(button: Button) -> void:
 func _style_primary_action(button: Button) -> void:
 	if button == null:
 		return
+	button.add_theme_font_override("font", heading_font)
 	button.add_theme_stylebox_override("normal", UITheme.box(UITheme.PRIMARY, UITheme.PRIMARY_DARK, 12, 1, 9))
 	button.add_theme_stylebox_override("hover", UITheme.box(Color("4cadd4"), UITheme.PRIMARY_DARK, 12, 1, 9))
 	button.add_theme_stylebox_override("pressed", UITheme.box(UITheme.PRIMARY_DARK, UITheme.PRIMARY_DARK, 12, 1, 9))
@@ -157,12 +173,13 @@ func _style_primary_action(button: Button) -> void:
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_font_size_override("font_size", 19)
 
 
 func _style_smash_action(button: Button) -> void:
 	if button == null:
 		return
+	button.add_theme_font_override("font", heading_font)
 	button.add_theme_stylebox_override("normal", UITheme.box(UITheme.ACCENT, UITheme.ACCENT_DARK, 12, 1, 9))
 	button.add_theme_stylebox_override("hover", UITheme.box(Color("ef7359"), UITheme.ACCENT_DARK, 12, 1, 9))
 	button.add_theme_stylebox_override("pressed", UITheme.box(UITheme.ACCENT_DARK, UITheme.ACCENT_DARK, 12, 1, 9))
@@ -170,12 +187,13 @@ func _style_smash_action(button: Button) -> void:
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_font_size_override("font_size", 19)
 
 
 func _style_reset_action(button: Button) -> void:
 	if button == null:
 		return
+	button.add_theme_font_override("font", body_font)
 	button.add_theme_stylebox_override("normal", UITheme.box(UITheme.SURFACE_MUTED, UITheme.BORDER, 12, 1, 9))
 	button.add_theme_stylebox_override("hover", UITheme.box(UITheme.SURFACE, UITheme.PRIMARY, 12, 1, 9))
 	button.add_theme_color_override("font_color", UITheme.FOREGROUND)
@@ -215,10 +233,11 @@ func _update_result_card() -> void:
 	elif last_result_text.begins_with("MOVING"):
 		background = UITheme.SURFACE_MUTED
 		foreground = UITheme.FOREGROUND_MUTED
-	result_label.custom_minimum_size = Vector2(0, 60)
-	result_label.add_theme_font_size_override("font_size", 29)
+	result_label.custom_minimum_size = Vector2(0, 54)
+	result_label.add_theme_font_override("font", heading_font)
+	result_label.add_theme_font_size_override("font_size", 27)
 	result_label.add_theme_color_override("font_color", foreground)
-	result_label.add_theme_stylebox_override("normal", UITheme.box(background, border, 14, 1, 9))
+	result_label.add_theme_stylebox_override("normal", UITheme.box(background, border, 14, 1, 8))
 
 
 func _update_selected_motion(delta: float) -> void:
@@ -236,7 +255,7 @@ func _find_label(root: Node, target_text: String) -> Label:
 	for child in root.get_children():
 		if child is Label and (child as Label).text == target_text:
 			return child as Label
-		var nested := _find_label(child, target_text)
+		var nested: Label = _find_label(child, target_text)
 		if nested != null:
 			return nested
 	return null

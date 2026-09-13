@@ -14,7 +14,7 @@ func _init(
 	stage_id: int,
 	stage_title: String,
 	start_position: Vector2i,
-	candidate_positions: Array[Vector2i],
+	candidate_positions: Array,
 	stage_par: int,
 	stage_stick_enabled: bool,
 	stage_intro: String
@@ -22,7 +22,8 @@ func _init(
 	id = stage_id
 	title = stage_title
 	start = start_position
-	candidates = candidate_positions
+	for position in candidate_positions:
+		candidates.append(position as Vector2i)
 	par = stage_par
 	stick_enabled = stage_stick_enabled
 	intro = stage_intro

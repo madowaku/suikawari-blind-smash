@@ -19,8 +19,35 @@ const SUCCESS_BG := Color("d9efd9")
 const FAIL_BG := Color("f4d0ca")
 
 
+static func heading_font() -> SystemFont:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Nunito", "Arial Rounded MT Bold", "Arial"])
+	font.font_weight = 800
+	font.allow_system_fallback = true
+	return font
+
+
+static func body_font() -> SystemFont:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Noto Sans JP", "Yu Gothic UI", "Meiryo", "Arial"])
+	font.font_weight = 500
+	font.allow_system_fallback = true
+	return font
+
+
+static func mono_font() -> SystemFont:
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["JetBrains Mono", "Consolas", "Courier New"])
+	font.font_weight = 700
+	font.allow_system_fallback = true
+	return font
+
+
 static func build_theme() -> Theme:
 	var theme := Theme.new()
+	var body := body_font()
+	theme.set_font("font", "Label", body)
+	theme.set_font("font", "Button", body)
 	theme.set_color("font_color", "Label", FOREGROUND)
 	theme.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0))
 	theme.set_font_size("font_size", "Label", 15)

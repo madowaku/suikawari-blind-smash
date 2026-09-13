@@ -12,6 +12,7 @@ const SMASH_REVEAL_HOLD := 0.38
 var game: Node
 var step_player: AudioStreamPlayer
 var feedback_player: AudioStreamPlayer
+var knock_player: AudioStreamPlayer
 var smash_player: AudioStreamPlayer
 var smash_overlay: Label
 
@@ -28,6 +29,8 @@ func _ready() -> void:
 	_build_audio_players()
 	_build_overlay()
 	_build_streams()
+	if game != null and game.has_signal("knock_detected"):
+		game.connect("knock_detected", Callable(self, "_on_knock_detected"))
 
 
 func _process(_delta: float) -> void:
@@ -51,19 +54,22 @@ func _process(_delta: float) -> void:
 	previous_position = player_position
 
 	if result_text != previous_result_text:
-		match result_text:
-			"HOTTER":
-				_play_stream(feedback_player, streams["hotter"], -3.0)
-			"COLDER":
-				_play_stream(feedback_player, streams["colder"], -3.0)
-			"SAME":
-				_play_stream(feedback_player, streams["same"], -5.0)
+		if result_text.begins_with("HOTTER"):
+			_play_stream(feedback_player, streams["hotter"], -3.0)
+		elif result_text.begins_with("COLDER"):
+			_play_stream(feedback_player, streams["colder"], -3.0)
+		elif result_text.begins_with("SAME"):
+			_play_stream(feedback_player, streams["same"], -5.0)
 	previous_result_text = result_text
 
 	if phase != previous_phase:
 		if (phase == "clear" or phase == "fail") and not smash_sequence_running:
 			_play_smash_sequence.call_deferred(phase == "clear")
 		previous_phase = phase
+
+
+func _on_knock_detected(_step_number: int) -> void:
+	_play_stream(knock_player, streams["knock"], -1.5)
 
 
 func _game_is_ready() -> bool:
@@ -84,6 +90,10 @@ func _build_audio_players() -> void:
 	feedback_player = AudioStreamPlayer.new()
 	feedback_player.name = "FeedbackSfx"
 	add_child(feedback_player)
+
+	knock_player = AudioStreamPlayer.new()
+	knock_player.name = "KnockSfx"
+	add_child(knock_player)
 
 	smash_player = AudioStreamPlayer.new()
 	smash_player.name = "SmashSfx"
@@ -118,6 +128,7 @@ func _build_streams() -> void:
 	streams["hotter"] = _make_tone_stream(0.18, 520.0, 820.0, 0.55)
 	streams["colder"] = _make_tone_stream(0.20, 520.0, 300.0, 0.50)
 	streams["same"] = _make_tone_stream(0.16, 440.0, 440.0, 0.34)
+	streams["knock"] = _make_knock_stream(0.085)
 	streams["swing"] = _make_noise_stream(0.16, 0.28, 260.0, 202)
 	streams["hit"] = _make_hit_stream(0.24, 303)
 	streams["miss"] = _make_noise_stream(0.18, 0.22, 520.0, 404)
@@ -194,6 +205,26 @@ func _make_tone_stream(duration: float, start_hz: float, end_hz: float, amplitud
 		var release := pow(1.0 - progress, 1.6)
 		var envelope := attack * release
 		var sample := sin(TAU * frequency * time) * amplitude * envelope
+		data[i] = _sample_to_byte(sample)
+
+	return _make_wav(data)
+
+
+func _make_knock_stream(duration: float) -> AudioStreamWAV:
+	var sample_count := int(duration * MIX_RATE)
+	var data := PackedByteArray()
+	data.resize(sample_count)
+	var noise_rng := RandomNumberGenerator.new()
+	noise_rng.seed = 5150
+
+	for i in range(sample_count):
+		var progress := float(i) / maxf(1.0, float(sample_count - 1))
+		var time := float(i) / float(MIX_RATE)
+		var envelope := pow(1.0 - progress, 4.0)
+		var wood := sin(TAU * 1280.0 * time) * 0.48
+		var body := sin(TAU * 410.0 * time) * 0.26
+		var click := noise_rng.randf_range(-1.0, 1.0) * 0.20
+		var sample := (wood + body + click) * envelope
 		data[i] = _sample_to_byte(sample)
 
 	return _make_wav(data)

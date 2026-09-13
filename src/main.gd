@@ -3,11 +3,9 @@ extends Control
 signal knock_detected(step_number: int)
 
 const GRID_SIZE := 5
-const START_POS := Vector2i(2, 4) # C5
-const CANDIDATES := [Vector2i(0, 4), Vector2i(4, 4)] # A5 / E5
-const PAR := 2
 const STEP_DURATION := 0.20
 const RESULT_HOLD := 0.45
+const StageCatalog = preload("res://src/stage_catalog.gd")
 
 const DIRECTIONS := {
 	"N": Vector2i(0, -1),
@@ -25,7 +23,10 @@ const STICK_OFFSETS := {
 }
 
 var rng := RandomNumberGenerator.new()
-var player_position := START_POS
+var stages: Array = []
+var stage_index := 0
+var current_stage
+var player_position := Vector2i.ZERO
 var watermelon_position := Vector2i.ZERO
 var selected_direction := ""
 var selected_steps := 0
@@ -41,10 +42,13 @@ var movement_trail: Array[Vector2i] = []
 var turn_log: Array[String] = []
 
 var header_label: Label
+var rule_label: Label
 var result_label: Label
 var message_label: Label
 var plan_label: Label
 var log_label: Label
+var stick_group: HBoxContainer
+var footer_label: Label
 var go_button: Button
 var smash_button: Button
 var reset_button: Button
@@ -53,6 +57,8 @@ var reset_button: Button
 func _ready() -> void:
 	rng.randomize()
 	_run_stick_self_check()
+	stages = StageCatalog.build()
+	current_stage = stages[stage_index]
 	_build_ui()
 	_start_stage()
 
@@ -88,12 +94,11 @@ func _build_ui() -> void:
 	header_label.add_theme_font_size_override("font_size", 16)
 	root.add_child(header_label)
 
-	var rule := Label.new()
-	rule.text = "Stage 1: the watermelon is hidden at A5 or E5.\nCommit direction + steps + stick side, read the result, then SMASH."
-	rule.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rule.add_theme_font_size_override("font_size", 13)
-	root.add_child(rule)
+	rule_label = Label.new()
+	rule_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rule_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rule_label.add_theme_font_size_override("font_size", 13)
+	root.add_child(rule_label)
 
 	result_label = Label.new()
 	result_label.text = "READY"
@@ -197,7 +202,7 @@ func _build_ui() -> void:
 		button.pressed.connect(_on_steps_pressed.bind(steps))
 		steps_row.add_child(button)
 
-	var stick_group := HBoxContainer.new()
+	stick_group = HBoxContainer.new()
 	stick_group.alignment = BoxContainer.ALIGNMENT_CENTER
 	stick_group.add_theme_constant_override("separation", 8)
 	root.add_child(stick_group)
@@ -236,7 +241,7 @@ func _build_ui() -> void:
 	reset_button = Button.new()
 	reset_button.text = "RESET"
 	reset_button.custom_minimum_size = Vector2(86, 46)
-	reset_button.pressed.connect(_start_stage)
+	reset_button.pressed.connect(_on_reset_pressed)
 	actions.add_child(reset_button)
 
 	message_label = Label.new()
@@ -258,11 +263,10 @@ func _build_ui() -> void:
 	log_label.add_theme_font_size_override("font_size", 13)
 	root.add_child(log_label)
 
-	var footer := Label.new()
-	footer.text = "Stick sensor active: K1-K4 records the contact step"
-	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	footer.add_theme_font_size_override("font_size", 11)
-	root.add_child(footer)
+	footer_label = Label.new()
+	footer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	footer_label.add_theme_font_size_override("font_size", 11)
+	root.add_child(footer_label)
 
 
 func _make_choice_button(text_value: String, minimum_size: Vector2) -> Button:
@@ -275,8 +279,9 @@ func _make_choice_button(text_value: String, minimum_size: Vector2) -> Button:
 
 
 func _start_stage() -> void:
-	player_position = START_POS
-	watermelon_position = CANDIDATES[rng.randi_range(0, CANDIDATES.size() - 1)]
+	current_stage = stages[stage_index]
+	player_position = current_stage.start
+	watermelon_position = current_stage.candidates[rng.randi_range(0, current_stage.candidates.size() - 1)]
 	selected_direction = ""
 	selected_steps = 0
 	selected_stick = ""
@@ -288,9 +293,22 @@ func _start_stage() -> void:
 	result_label.modulate = Color.WHITE
 	result_label.scale = Vector2.ONE
 	result_label.add_theme_color_override("font_color", Color(0.18, 0.20, 0.24))
-	message_label.text = "Choose direction, 1-4 steps, and LEFT/RIGHT stick side."
+	rule_label.text = "%s\n%s" % [current_stage.title, current_stage.intro]
+	stick_group.visible = current_stage.stick_enabled
+	footer_label.text = "Stick sensor active: K1-K4 records contact step" if current_stage.stick_enabled else "Temperature sensor only: HOTTER / SAME / COLDER"
+	message_label.text = "Choose direction + steps + stick side." if current_stage.stick_enabled else "Choose direction and 1-4 steps."
+	reset_button.text = "RESET"
 	_update_log_label()
 	_refresh_ui()
+
+
+func _on_reset_pressed() -> void:
+	if phase == "clear":
+		if stage_index < stages.size() - 1:
+			stage_index += 1
+		_start_stage()
+		return
+	_start_stage()
 
 
 func _on_direction_pressed(code: String) -> void:
@@ -310,7 +328,7 @@ func _on_steps_pressed(steps: int) -> void:
 
 
 func _on_stick_pressed(side: String) -> void:
-	if phase != "input":
+	if phase != "input" or not current_stage.stick_enabled:
 		return
 	selected_stick = side
 	_refresh_ui()
@@ -332,7 +350,8 @@ func _on_go_pressed() -> void:
 	movement_trail.clear()
 	result_label.text = "MOVING..."
 	result_label.add_theme_color_override("font_color", Color(0.24, 0.31, 0.38))
-	message_label.text = "Committed %s%d%s. You cannot stop mid-move." % [input_direction, input_steps, input_stick]
+	var action_name := "%s%d%s" % [input_direction, input_steps, input_stick] if current_stage.stick_enabled else "%s%d" % [input_direction, input_steps]
+	message_label.text = "Committed %s. You cannot stop mid-move." % action_name
 	_refresh_ui()
 
 	await get_tree().create_timer(0.08).timeout
@@ -342,11 +361,11 @@ func _on_go_pressed() -> void:
 		movement_trail.append(player_position)
 		var current_step := step_index + 1
 
-		if knock_step < 0 and _stick_touches_watermelon(player_position, input_direction, input_stick):
+		if current_stage.stick_enabled and knock_step < 0 and _stick_touches_watermelon(player_position, input_direction, input_stick):
 			knock_step = current_step
 			result_label.text = "KOTSU!  K%d" % knock_step
 			result_label.add_theme_color_override("font_color", Color(0.86, 0.48, 0.08))
-			message_label.text = "KOTSU! The stick touched something on step %d. Keep moving." % knock_step
+			message_label.text = "KOTSU! Contact on step %d. Keep moving." % knock_step
 			knock_detected.emit(knock_step)
 		else:
 			message_label.text = "Step %d / %d" % [current_step, input_steps]
@@ -384,10 +403,10 @@ func _on_smash_pressed() -> void:
 		result_label.modulate = Color.WHITE
 		result_label.scale = Vector2.ONE
 		result_label.add_theme_color_override("font_color", Color(0.10, 0.55, 0.24))
-		if turn <= PAR:
-			message_label.text = "Direct hit in %d turn(s). PAR %d cleared!" % [turn, PAR]
+		if turn <= current_stage.par:
+			message_label.text = "Direct hit in %d turn(s). PAR %d cleared!" % [turn, current_stage.par]
 		else:
-			message_label.text = "Direct hit in %d turn(s). Try again for PAR %d." % [turn, PAR]
+			message_label.text = "Direct hit in %d turn(s). Try again for PAR %d." % [turn, current_stage.par]
 	else:
 		phase = "fail"
 		result_label.text = "MISS"
@@ -436,8 +455,9 @@ func _play_result_pop() -> void:
 
 
 func _append_log(turn_number: int, direction: String, steps: int, stick: String, temperature: String, knock_step: int) -> void:
+	var action_name := "%s%d%s" % [direction, steps, stick] if current_stage.stick_enabled else "%s%d" % [direction, steps]
 	var knock_text := "" if knock_step < 0 else " + K%d" % knock_step
-	turn_log.append("T%d   %s%d%s  ->  %s%s" % [turn_number, direction, steps, stick, temperature, knock_text])
+	turn_log.append("T%d   %s  ->  %s%s" % [turn_number, action_name, temperature, knock_text])
 	if turn_log.size() > 4:
 		turn_log.pop_front()
 	_update_log_label()
@@ -464,7 +484,7 @@ func _refresh_ui() -> void:
 
 
 func _update_header() -> void:
-	header_label.text = "STAGE 1   |   PAR %d   |   TURN %d   |   CANDIDATES 2" % [PAR, turn]
+	header_label.text = "STAGE %d/5   |   PAR %d   |   TURN %d   |   CANDIDATES %d" % [current_stage.id, current_stage.par, turn, current_stage.candidates.size()]
 
 
 func _update_choice_buttons() -> void:
@@ -477,7 +497,7 @@ func _update_choice_buttons() -> void:
 		step_buttons[steps].disabled = not input_enabled
 	for side in stick_buttons:
 		stick_buttons[side].button_pressed = side == selected_stick
-		stick_buttons[side].disabled = not input_enabled
+		stick_buttons[side].disabled = not input_enabled or not current_stage.stick_enabled
 
 
 func _update_plan() -> void:
@@ -488,16 +508,20 @@ func _update_plan() -> void:
 		plan_label.text = "Read the result, then choose your next commitment."
 		return
 	if phase == "clear":
-		plan_label.text = "Stage 1 complete."
+		plan_label.text = "Stage %d complete." % current_stage.id
 		return
 	if phase == "fail":
 		plan_label.text = "Missed. Reset to reshuffle the hidden watermelon."
 		return
-	if selected_direction == "" or selected_steps == 0 or selected_stick == "":
-		plan_label.text = "Plan: choose direction + steps + stick side"
+
+	var missing_stick := current_stage.stick_enabled and selected_stick == ""
+	if selected_direction == "" or selected_steps == 0 or missing_stick:
+		plan_label.text = "Plan: direction + steps + stick side" if current_stage.stick_enabled else "Plan: direction + steps"
 		return
+
 	if _selection_is_valid():
-		plan_label.text = "Plan: %s%d%s  ->  %s" % [selected_direction, selected_steps, selected_stick, _coord_name(_get_end_position(player_position, selected_direction, selected_steps))]
+		var action_name := "%s%d%s" % [selected_direction, selected_steps, selected_stick] if current_stage.stick_enabled else "%s%d" % [selected_direction, selected_steps]
+		plan_label.text = "Plan: %s  ->  %s" % [action_name, _coord_name(_get_end_position(player_position, selected_direction, selected_steps))]
 	else:
 		plan_label.text = "That move would leave the 5x5 beach."
 
@@ -561,6 +585,11 @@ func _update_action_buttons() -> void:
 	var busy := phase == "moving" or phase == "showing_result" or phase == "smashing"
 	reset_button.disabled = busy
 
+	if phase == "clear":
+		reset_button.text = "NEXT" if stage_index < stages.size() - 1 else "REPLAY"
+	else:
+		reset_button.text = "RESET"
+
 	if phase != "input":
 		go_button.disabled = true
 		smash_button.disabled = true
@@ -571,7 +600,9 @@ func _update_action_buttons() -> void:
 
 
 func _selection_is_valid() -> bool:
-	if selected_direction == "" or selected_steps <= 0 or selected_stick == "":
+	if selected_direction == "" or selected_steps <= 0:
+		return false
+	if current_stage.stick_enabled and selected_stick == "":
 		return false
 	var pos := player_position
 	var delta: Vector2i = DIRECTIONS[selected_direction]
@@ -625,7 +656,7 @@ func _inside_board(pos: Vector2i) -> bool:
 
 
 func _is_candidate(pos: Vector2i) -> bool:
-	return pos in CANDIDATES
+	return pos in current_stage.candidates
 
 
 func _manhattan(a: Vector2i, b: Vector2i) -> int:
